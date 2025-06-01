@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Transcriptor de Audio con Whisper</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body { padding-top: 2rem; padding-bottom: 2rem; background-color: #f8f9fa; }
+        .container { max-width: 700px; background-color: #fff; padding: 2rem; border-radius: 0.5rem; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075); }
+        .upload-label { cursor: pointer; }
+        .spinner-border { display: none; /* Se mostrará con JS si se implementa carga */ }
+        .messages .alert { margin-top: 1rem; }
+        .time-input-group { display: flex; gap: 1rem; margin-bottom: 1rem; }
+        .time-input-group > div { flex: 1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="mb-4 text-center">Transcribir Archivo de Audio</h2>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="messages">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="post" enctype="multipart/form-data" id="uploadForm">
+            <div class="custom-file mb-3">
+                <input type="file" class="custom-file-input" id="audio_file" name="audio_file" required>
+                <label class="custom-file-label upload-label" for="audio_file" data-browse="Seleccionar">Elegir archivo de audio...</label>
+            </div>
+            <p class="text-muted small">Formatos permitidos: .wav, .mp3, .ogg, .m4a, .flac</p>
+
+            <div class="time-input-group">
+                <div>
+                    <label for="start_time">Tiempo de Inicio (Opcional)</label>
+                    <input type="text" class="form-control" id="start_time" name="start_time" placeholder="HH:MM:SS">
+                </div>
+                <div>
+                    <label for="end_time">Tiempo de Fin (Opcional)</label>
+                    <input type="text" class="form-control" id="end_time" name="end_time" placeholder="HH:MM:SS">
+                </div>
+            </div>
+            <p class="text-muted small">Si no se especifica el tiempo de fin, se transcribirá hasta el final del audio.</p>
+            
+            <button type="submit" class="btn btn-primary btn-block" id="submitButton">
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                Transcribir
+            </button>
+        </form>
+        <p id="processingMessage" class="text-center mt-3" style="display: none;">Procesando, por favor espera...</p>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        // Para mostrar el nombre del archivo en el input personalizado
+        document.querySelector('.custom-file-input').addEventListener('change', function(e){
+            var fileName = document.getElementById("audio_file").files[0].name;
+            var nextSibling = e.target.nextElementSibling
+            nextSibling.innerText = fileName
+        })
+
+        // Mostrar mensaje de "Procesando"
+        document.getElementById('uploadForm').addEventListener('submit', function() {
+            document.getElementById('submitButton').disabled = true;
+            document.querySelector('#submitButton .spinner-border').style.display = 'inline-block';
+            document.getElementById('processingMessage').style.display = 'block';
+        });
+    </script>
+</body>
+</html>
