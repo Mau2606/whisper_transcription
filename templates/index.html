@@ -4,79 +4,216 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>Transcriptor de Audio con Whisper</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.3.0/mdb.min.css">
+
     <style>
-        body { padding-top: 2rem; padding-bottom: 2rem; background-color: #f8f9fa; }
-        .container { max-width: 700px; background-color: #fff; padding: 2rem; border-radius: 0.5rem; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075); }
-        .upload-label { cursor: pointer; }
-        .spinner-border { display: none; /* Se mostrará con JS si se implementa carga */ }
-        .messages .alert { margin-top: 1rem; }
-        .time-input-group { display: flex; gap: 1rem; margin-bottom: 1rem; }
-        .time-input-group > div { flex: 1; }
+        body { 
+            padding-top: 2rem; 
+            padding-bottom: 2rem; 
+            background-color: #f5f5f5; /* Tono Material ligero */
+        }
+        .container { 
+            max-width: 700px; 
+            background-color: #fff; 
+            padding: 2.5rem; /* Más padding */
+            border-radius: 0.5rem; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); /* Sombra más pronunciada */
+        }
+        /* Estilo para que los mensajes flash se vean bien */
+        .alert {
+            margin-top: 1.5rem;
+        }
+        /* Estilo para el contenedor de duración y controles de tiempo */
+        #audioInfoContainer {
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background-color: #e9ecef;
+            border-radius: 0.25rem;
+            text-align: center;
+        }
+        #audioDurationDisplay {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+        .time-controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        /* Asegurar que input type="time" se vea bien */
+        input[type="time"] {
+            appearance: none; /* Intenta quitar estilos por defecto del navegador si es necesario */
+            -webkit-appearance: none;
+            -moz-appearance: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2 class="mb-4 text-center">Transcribir Archivo de Audio</h2>
+        <h2 class="mb-4 text-center fw-bold">Transcribir Audio</h2>
         
+        <div id="flashMessagesContainer">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <div class="messages">
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert" data-mdb-alert-init data-mdb-autohide="true" data-mdb-delay="10000">
                         {{ message }}
-                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
+                        <button type="button" class="btn-close" data-mdb-dismiss="alert" aria-label="Close"></button>
                     </div>
                 {% endfor %}
-                </div>
             {% endif %}
         {% endwith %}
+        </div>
 
         <form method="post" enctype="multipart/form-data" id="uploadForm">
-            <div class="custom-file mb-3">
-                <input type="file" class="custom-file-input" id="audio_file" name="audio_file" required>
-                <label class="custom-file-label upload-label" for="audio_file" data-browse="Seleccionar">Elegir archivo de audio...</label>
-            </div>
-            <p class="text-muted small">Formatos permitidos: .wav, .mp3, .ogg, .m4a, .flac</p>
+            <div class="form-outline mb-4" data-mdb-input-init>
+                <input type="file" class="form-control" id="audio_file" name="audio_file" required />
+                </div>
+             <p class="text-muted small mb-3">Formatos permitidos: .wav, .mp3, .ogg, .m4a, .flac</p>
 
-            <div class="time-input-group">
-                <div>
-                    <label for="start_time">Tiempo de Inicio (Opcional)</label>
-                    <input type="text" class="form-control" id="start_time" name="start_time" placeholder="HH:MM:SS">
+
+            <div id="audioInfoContainer" style="display: none;"> <p id="audioDurationDisplay">Duración del audio: --:--</p>
+                <div class="time-controls-grid">
+                    <div class="form-outline" data-mdb-input-init>
+                        <input type="time" id="start_time" name="start_time" class="form-control" step="1" />
+                        <label class="form-label" for="start_time">Tiempo de Inicio (HH:MM:SS)</label>
+                    </div>
+                    <div class="form-outline" data-mdb-input-init>
+                        <input type="time" id="end_time" name="end_time" class="form-control" step="1" />
+                        <label class="form-label" for="end_time">Tiempo de Fin (HH:MM:SS)</label>
+                    </div>
                 </div>
-                <div>
-                    <label for="end_time">Tiempo de Fin (Opcional)</label>
-                    <input type="text" class="form-control" id="end_time" name="end_time" placeholder="HH:MM:SS">
-                </div>
+                <p class="text-muted small mt-2">Si no se especifica fin, se transcribe hasta el final.</p>
             </div>
-            <p class="text-muted small">Si no se especifica el tiempo de fin, se transcribirá hasta el final del audio.</p>
             
-            <button type="submit" class="btn btn-primary btn-block" id="submitButton">
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                Transcribir
+            <button type="submit" class="btn btn-primary btn-lg btn-block mt-4" id="submitButton" data-mdb-ripple-init>
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style="display: none;"></span>
+                Transcribir Audio
             </button>
         </form>
         <p id="processingMessage" class="text-center mt-3" style="display: none;">Procesando, por favor espera...</p>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.3.0/mdb.umd.min.js"></script>
+    
     <script>
-        // Para mostrar el nombre del archivo en el input personalizado
-        document.querySelector('.custom-file-input').addEventListener('change', function(e){
-            var fileName = document.getElementById("audio_file").files[0].name;
-            var nextSibling = e.target.nextElementSibling
-            nextSibling.innerText = fileName
-        })
+        document.addEventListener('DOMContentLoaded', function () {
+            // Inicializar componentes MDB que lo requieran (como alerts con autohide)
+            // Esto puede no ser necesario si usas data-mdb-attributes, pero es buena práctica.
+            document.querySelectorAll('[data-mdb-alert-init]').forEach(alertEl => {
+                 new mdb.Alert(alertEl);
+            });
+            
+            const audioFileInput = document.getElementById('audio_file');
+            const audioInfoContainer = document.getElementById('audioInfoContainer');
+            const audioDurationDisplay = document.getElementById('audioDurationDisplay');
+            const startTimeInput = document.getElementById('start_time');
+            const endTimeInput = document.getElementById('end_time');
 
-        // Mostrar mensaje de "Procesando"
-        document.getElementById('uploadForm').addEventListener('submit', function() {
-            document.getElementById('submitButton').disabled = true;
-            document.querySelector('#submitButton .spinner-border').style.display = 'inline-block';
-            document.getElementById('processingMessage').style.display = 'block';
+            let audioObjectUrl = null; // Para manejar la URL del objeto de audio
+
+            audioFileInput.addEventListener('change', function(event) {
+                const file = event.target.files[0];
+
+                // Limpiar información anterior
+                if (audioObjectUrl) {
+                    URL.revokeObjectURL(audioObjectUrl);
+                    audioObjectUrl = null;
+                }
+                audioDurationDisplay.textContent = 'Duración del audio: Cargando...';
+                audioInfoContainer.style.display = 'none'; // Ocultar mientras carga
+                startTimeInput.value = ''; // Resetear tiempos
+                endTimeInput.value = '';   // Resetear tiempos
+
+
+                if (file) {
+                    audioObjectUrl = URL.createObjectURL(file);
+                    const audioElement = new Audio();
+                    audioElement.src = audioObjectUrl;
+
+                    audioElement.addEventListener('loadedmetadata', function() {
+                        const duration = audioElement.duration;
+                        if (isFinite(duration)) {
+                            const hours = Math.floor(duration / 3600);
+                            const minutes = Math.floor((duration % 3600) / 60);
+                            const seconds = Math.floor(duration % 60);
+
+                            let formattedDuration = '';
+                            if (hours > 0) {
+                                formattedDuration += `${String(hours).padStart(2, '0')}:`;
+                            }
+                            formattedDuration += `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                            
+                            audioDurationDisplay.textContent = `Duración del audio: ${formattedDuration}`;
+                            
+                            // Configurar el máximo para los time pickers (útil si fueran sliders)
+                            // Para input type="time", esto no es un 'max' directo, pero ayuda a saber el rango.
+                            // Puedes usarlo para validar en JS si quieres, aunque el backend también valida.
+                        } else {
+                            audioDurationDisplay.textContent = 'Duración del audio: No disponible';
+                        }
+                        audioInfoContainer.style.display = 'block'; // Mostrar contenedor
+                        
+                        // No es necesario revocar aquí si se hace al cambiar/limpiar
+                    });
+
+                    audioElement.addEventListener('error', function() {
+                        audioDurationDisplay.textContent = 'Error al cargar metadatos del audio.';
+                        audioInfoContainer.style.display = 'block'; // Mostrar para ver el error
+                         if (audioObjectUrl) { // Limpiar si hay error y se creó URL
+                            URL.revokeObjectURL(audioObjectUrl);
+                            audioObjectUrl = null;
+                        }
+                    });
+
+                } else {
+                    audioInfoContainer.style.display = 'none';
+                    audioDurationDisplay.textContent = 'Duración del audio: --:--';
+                }
+            });
+
+            // Mostrar mensaje de "Procesando" y spinner
+            const uploadForm = document.getElementById('uploadForm');
+            const submitButton = document.getElementById('submitButton');
+            const spinner = submitButton.querySelector('.spinner-border');
+            const processingMessage = document.getElementById('processingMessage');
+
+            if (uploadForm) {
+                uploadForm.addEventListener('submit', function() {
+                    submitButton.disabled = true;
+                    if(spinner) spinner.style.display = 'inline-block';
+                    if(processingMessage) processingMessage.style.display = 'block';
+                });
+            }
+            
+            // Desvanecimiento de alertas (si data-mdb-autohide no es suficiente o para alertas dinámicas)
+            // MDB 7 con data-mdb-autohide="true" y data-mdb-delay="10000" debería manejarlo.
+            // Este código es un fallback o para mayor control si fuera necesario.
+            const alerts = document.querySelectorAll('#flashMessagesContainer .alert');
+            alerts.forEach(function(alert) {
+                // Si MDB no lo está manejando ya con autohide, este setTimeout lo hará.
+                // Pero es mejor confiar en el data-mdb-autohide.
+                // Este bloque se puede comentar si el autohide de MDB funciona bien.
+                /*
+                setTimeout(function() {
+                    // Usar la API de MDB para cerrar el alert si está disponible y es más suave
+                    const mdbAlertInstance = mdb.Alert.getInstance(alert);
+                    if (mdbAlertInstance) {
+                        mdbAlertInstance.dispose(); // Cierra y elimina el componente MDB
+                    } else {
+                        alert.classList.remove('show'); // Fallback si no es un componente MDB o ya se fue
+                        // Esperar a que termine la transición de desvanecimiento de Bootstrap/MDB
+                        setTimeout(() => {
+                           if(alert.parentNode) alert.parentNode.removeChild(alert);
+                        }, 300); // Ajustar este tiempo si es necesario
+                    }
+                }, 10000); // 10 segundos
+                */
+            });
         });
     </script>
 </body>
